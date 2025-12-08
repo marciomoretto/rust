@@ -9,21 +9,21 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// - Não permite elementos repetidos.
 /// - `S` é o tipo responsável por construir hashers (ex.: `RandomState`, `FxBuildHasher`, etc.).
 #[derive(Debug)]
-pub struct HashChainingSet<T, S = RandomState> {
+pub struct HashProbingSet<T, S = RandomState> {
     buckets: Vec<Vec<T>>,
     len: usize,
     hash_builder: S,
 }
 
 // Construtor padrão: usa o mesmo hasher do HashMap (`RandomState`)
-impl<T> HashChainingSet<T, RandomState> {
+impl<T> HashProbingSet<T, RandomState> {
     pub fn new() -> Self {
         Self::with_hasher(RandomState::new())
     }
 }
 
 // Implementação genérica em qualquer `S: BuildHasher`
-impl<T, S> HashChainingSet<T, S>
+impl<T, S> HashProbingSet<T, S>
 where
     S: BuildHasher,
 {
@@ -107,7 +107,7 @@ where
 // impl Set<T> for HashSet<T, S>
 // ========================
 
-impl<T, S> Set<T> for HashChainingSet<T, S>
+impl<T, S> Set<T> for HashProbingSet<T, S>
 where
     T: Eq + Hash,
     S: BuildHasher,
@@ -148,5 +148,17 @@ where
 
     fn len(&self) -> usize {
         self.len
+    }
+}
+
+impl<T> crate::set::SetName for HashProbingSet<T> {
+    fn name() -> &'static str {
+        "HashProbingSet"
+    }
+}
+
+impl<T> Default for HashProbingSet<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }

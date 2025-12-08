@@ -79,3 +79,15 @@ impl<T: PartialEq> Set<T> for ListSet<T> {
         self.len
     }
 }
+
+impl<T> crate::set::SetName for ListSet<T> {
+    fn name() -> &'static str {
+        "ListSet"
+    }
+}
+
+impl<T> Default for ListSet<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

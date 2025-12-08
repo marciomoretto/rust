@@ -54,27 +54,6 @@ fn bstset_basico() {
     testa_set_basico(s);
 }
 
-// =======================
-// HashSet (chaining)
-// =======================
-
-#[test]
-fn hashset_chaining_basico() {
-    let s: HashChainingSet<i32> = HashChainingSet::new();
-    testa_set_basico(s);
-}
-
-
-// =======================
-// HashSetProbing (linear probing)
-// =======================
-
-#[test]
-fn hashset_probing_basico() {
-    let s: HashProbingSet<i32> = HashProbingSet::new();
-    testa_set_basico(s);
-}
-
 #[test]
 fn bstavlset_basico() {
     let s = BstAvlSet::new();
@@ -86,3 +65,20 @@ fn bstrbset_basico() {
     let s = BstRBSet::new();
     testa_set_basico(s);
 }
+
+// =======================
+// HashSet 
+// =======================
+
+#[test]
+fn hashset_chaining_basico() {
+    let s: HashChainingSet<i32> = HashChainingSet::new();
+    testa_set_basico(s);
+}
+
+#[test]
+fn hashset_probing_basico() {
+    let s: HashProbingSet<i32> = HashProbingSet::new();
+    testa_set_basico(s);
+}
+

@@ -268,3 +268,15 @@ impl<T: Ord> Set<T> for BstAvlSet<T> {
         self.len
     }
 }
+
+impl<T> crate::set::SetName for BstAvlSet<T> {
+    fn name() -> &'static str {
+        "BstAvlSet"
+    }
+}
+
+impl<T> Default for BstAvlSet<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

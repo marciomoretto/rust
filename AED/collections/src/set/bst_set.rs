@@ -153,3 +153,15 @@ impl<T: Ord> Set<T> for BstSet<T> {
         self.len
     }
 }
+
+impl<T> crate::set::SetName for BstSet<T> {
+    fn name() -> &'static str {
+        "BstSet"
+    }
+}
+
+impl<T> Default for BstSet<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

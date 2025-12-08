@@ -18,6 +18,10 @@ pub trait Set<T> {
     }
 }
 
+pub trait SetName {
+    fn name() -> &'static str;
+}
+
 pub mod list_set;
 
 pub mod bst_set;
