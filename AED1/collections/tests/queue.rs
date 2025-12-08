@@ -1,12 +1,13 @@
-use queue::{ArrayQueue, ListQueue, Queue, QueueError};
+use collections::queue::Queue;
+use collections::queue::{ArrayQueue, ListQueue};
 
 /// Função auxiliar: testa comportamento FIFO básico em qualquer implementação de Queue<i32>.
 fn testa_fila_basica<Q: Queue<i32>>(mut q: Q) {
     assert!(q.is_empty());
 
-    q.enqueue(10).unwrap();
-    q.enqueue(20).unwrap();
-    q.enqueue(30).unwrap();
+    q.enqueue(10);
+    q.enqueue(20);
+    q.enqueue(30);
 
     // FIFO: primeiro a entrar, primeiro a sair
     assert_eq!(q.front(), Some(&10));
@@ -20,22 +21,22 @@ fn testa_fila_basica<Q: Queue<i32>>(mut q: Q) {
 
 #[test]
 fn arrayqueue_nova_fila_deve_comecar_vazia() {
-    let q: ArrayQueue<i32, 10> = ArrayQueue::new();
+    let q: ArrayQueue<i32> = ArrayQueue::new();
     assert!(q.is_empty());
 }
 
 #[test]
 fn arrayqueue_deve_seguir_ordem_fifo() {
-    let q: ArrayQueue<i32, 10> = ArrayQueue::new();
+    let q: ArrayQueue<i32> = ArrayQueue::new();
     testa_fila_basica(q);
 }
 
 #[test]
 fn arrayqueue_front_nao_deve_remover_o_elemento() {
-    let mut q: ArrayQueue<i32, 10> = ArrayQueue::new();
+    let mut q: ArrayQueue<i32> = ArrayQueue::new();
 
-    q.enqueue(1).unwrap();
-    q.enqueue(2).unwrap();
+    q.enqueue(1);
+    q.enqueue(2);
 
     assert_eq!(q.front(), Some(&1));
 
@@ -45,22 +46,11 @@ fn arrayqueue_front_nao_deve_remover_o_elemento() {
 }
 
 #[test]
-fn arrayqueue_deve_retornar_overflow_quando_cheia() {
-    let mut q: ArrayQueue<i32, 2> = ArrayQueue::new();
-
-    assert_eq!(q.enqueue(1), Ok(()));
-    assert_eq!(q.enqueue(2), Ok(()));
-
-    let r = q.enqueue(3);
-    assert_eq!(r, Err(QueueError::Overflow));
-}
-
-#[test]
 fn arrayqueue_deve_funcionar_com_tipo_nao_copy() {
-    let mut q: ArrayQueue<String, 2> = ArrayQueue::new();
+    let mut q: ArrayQueue<String> = ArrayQueue::new();
 
-    q.enqueue("oi".to_string()).unwrap();
-    q.enqueue("tchau".to_string()).unwrap();
+    q.enqueue("oi".to_string());
+    q.enqueue("tchau".to_string());
 
     assert_eq!(q.front().map(|s| s.as_str()), Some("oi"));
 
@@ -87,8 +77,8 @@ fn listqueue_deve_seguir_ordem_fifo() {
 fn listqueue_front_nao_deve_remover_o_elemento() {
     let mut q: ListQueue<i32> = ListQueue::new();
 
-    q.enqueue(1).unwrap();
-    q.enqueue(2).unwrap();
+    q.enqueue(1);
+    q.enqueue(2);
 
     assert_eq!(q.front(), Some(&1));
 
@@ -101,8 +91,8 @@ fn listqueue_front_nao_deve_remover_o_elemento() {
 fn listqueue_deve_funcionar_com_tipo_nao_copy() {
     let mut q: ListQueue<String> = ListQueue::new();
 
-    q.enqueue("oi".to_string()).unwrap();
-    q.enqueue("tchau".to_string()).unwrap();
+    q.enqueue("oi".to_string());
+    q.enqueue("tchau".to_string());
 
     assert_eq!(q.front().map(|s| s.as_str()), Some("oi"));
 

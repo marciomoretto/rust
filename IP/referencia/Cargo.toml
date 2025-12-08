@@ -1,3 +1,4 @@
+workspace = { members = [ "recursao","string", "structs"] }
 [package]
 name = "referencia"
 version = "0.1.0"
