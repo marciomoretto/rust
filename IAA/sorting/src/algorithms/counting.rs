@@ -27,12 +27,6 @@ fn counting_sort(slice: &mut [i32]) {
     // Range de valores (max - min + 1)
     let range = (max as i64 - min as i64 + 1) as usize;
 
-    // Se o range explodir (caso patológico), cai pra sort() da std
-    if range > 1_000_000_0 {
-        slice.sort();
-        return;
-    }
-
     let mut counts = vec![0usize; range];
 
     // Conta ocorrências

@@ -12,6 +12,7 @@ pub mod quick;
 pub mod heap;
 pub mod counting;
 pub mod radix;
+pub mod bucket;
 
 pub use bubble::Bubble;
 pub use insertion::Insertion;
@@ -22,3 +23,4 @@ pub use quick::QuickSort;
 pub use heap::HeapSort;
 pub use counting::CountingSort;
 pub use radix::RadixSort;
+pub use bucket::BucketSort;

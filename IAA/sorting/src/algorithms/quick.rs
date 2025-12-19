@@ -23,7 +23,7 @@ fn quick_sort<T: Ord>(slice: &mut [T]) {
         return;
     }
 
-    let p = partition_random(slice);
+    let p = partition(slice);
 
     let (left, right_with_pivot) = slice.split_at_mut(p);
     let (_pivot, right) = right_with_pivot.split_first_mut().unwrap();

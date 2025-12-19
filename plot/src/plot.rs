@@ -19,17 +19,121 @@ struct Record {
     time_per_op: f64,
 }
 
-/// Lê o CSV, separa por *workload*, gera um PNG por workload e
-/// salva os coeficientes de regressão em:
-///     output_dir/regression.csv
+/// Escalas suportadas (mantém LOG-LOG como padrão):
 ///
-/// Se `use_time_per_op` for `true`, usa `time_per_op` na regressão.
-/// Caso contrário, usa `time_total`.
+/// - LogLog: x = log10(n), y = log10(tempo)
+/// - LogLin: x = n,        y = log10(tempo)
+/// - LinLog: x = log10(n), y = tempo
+#[derive(Clone, Copy, Debug)]
+pub enum PlotScale {
+    LogLog,
+    LogLin,
+    LinLog,
+    LinLin,
+}
+
+impl PlotScale {
+    fn tag(self) -> &'static str {
+        match self {
+            PlotScale::LogLog => "loglog",
+            PlotScale::LogLin => "loglin",
+            PlotScale::LinLog => "linlog",
+            PlotScale::LinLin => "linlin",
+        }
+    }
+
+    fn title(self) -> &'static str {
+        match self {
+            PlotScale::LogLog => "log–log",
+            PlotScale::LogLin => "log–lin",
+            PlotScale::LinLog => "lin–log",
+            PlotScale::LinLin => "lin–lin",
+        }
+    }
+
+    fn x_label(self) -> &'static str {
+        match self {
+            PlotScale::LogLog | PlotScale::LinLog => "log10(n)",
+            PlotScale::LogLin | PlotScale::LinLin => "n (×10⁶)",
+        }
+    }
+
+      fn y_label(self, use_time_per_op: bool) -> &'static str {
+        match self {
+            // y linear
+            PlotScale::LinLog | PlotScale::LinLin => {
+                if use_time_per_op { "tempo por operação" } else { "tempo total" }
+            }
+            // y log
+            PlotScale::LogLog | PlotScale::LogLin => {
+                if use_time_per_op { "log10(tempo por operação)" } else { "log10(tempo total)" }
+            }
+        }
+    }
+}
+
+fn project_point(n: usize, time: f64, scale: PlotScale) -> Option<(f64, f64)> {
+    if n == 0 || time <= 0.0 {
+        return None;
+    }
+
+    let n_f = n as f64;
+
+    let (x, y) = match scale {
+        PlotScale::LogLog => (n_f.log10(), time.log10()),
+        PlotScale::LogLin => (n_f / 1e6, time.log10()),
+        PlotScale::LinLog => (n_f.log10(), time),
+        PlotScale::LinLin => (n_f / 1e6, time),
+    };
+
+    Some((x, y))
+}
+
+/// R² da regressão y = a x + b
+pub fn r2_score(xs: &[f64], ys: &[f64], a: f64, b: f64) -> f64 {
+    if xs.len() != ys.len() || xs.len() < 2 {
+        return f64::NAN;
+    }
+
+    let mean_y = ys.iter().sum::<f64>() / (ys.len() as f64);
+
+    let mut ss_res = 0.0;
+    let mut ss_tot = 0.0;
+
+    for (&x, &y) in xs.iter().zip(ys.iter()) {
+        let y_hat = a * x + b;
+        let dy = y - y_hat;
+        ss_res += dy * dy;
+
+        let dt = y - mean_y;
+        ss_tot += dt * dt;
+    }
+
+    if ss_tot == 0.0 {
+        1.0
+    } else {
+        1.0 - (ss_res / ss_tot)
+    }
+}
+
+/// Lê o CSV, separa por workload, gera PNGs e
+/// salva os coeficientes de regressão.
+///
+/// Para não sobrescrever, salva:
+///   regression_<tag>.csv
+///
+/// CSV gerado:
+///   workload;implementation;alpha;C;R2
+///
+/// Interpretação:
+/// - Se Y está em log10 (LogLog/LogLin):    log10(t) = alpha * x + log10(C)  => C = 10^intercept
+/// - Se Y é linear (LinLog):               t = alpha * log10(n) + C         => C = intercept
 pub fn plot_from_csv(
     csv_path: &str,
     workloads: &[&str],
     output_dir: &str,
     use_time_per_op: bool,
+    scale: PlotScale,
 ) -> Result<(), Box<dyn Error>> {
     std::fs::create_dir_all(output_dir)?;
 
@@ -39,8 +143,7 @@ pub fn plot_from_csv(
 
     let mut records: Vec<Record> = Vec::new();
     for result in rdr.deserialize::<Record>() {
-        let rec = result?;
-        records.push(rec);
+        records.push(result?);
     }
 
     // Agrupa por workload
@@ -52,9 +155,10 @@ pub fn plot_from_csv(
             .push(rec);
     }
 
-    // Arquivo CSV com coeficientes de regressão
-    let mut reg_file = File::create(Path::new(output_dir).join("regression.csv"))?;
-    writeln!(&mut reg_file, "workload;implementation;alpha;C")?;
+    // CSV de regressão (separado por escala)
+    let reg_path = Path::new(output_dir).join(format!("regression_{}.csv", scale.tag()));
+    let mut reg_file = File::create(reg_path)?;
+    writeln!(&mut reg_file, "workload;implementation;alpha;C;R2")?;
 
     // Plota cada workload pedido
     for &workload in workloads {
@@ -66,6 +170,7 @@ pub fn plot_from_csv(
                     output_dir,
                     &mut reg_file,
                     use_time_per_op,
+                    scale,
                 )?;
             }
         }
@@ -80,78 +185,61 @@ fn plot_workload(
     output_dir: &str,
     reg_out: &mut dyn Write,
     use_time_per_op: bool,
+    scale: PlotScale,
 ) -> Result<(), Box<dyn Error>> {
-    // Converte para log-log imediatamente
-    let mut by_impl_log: HashMap<String, Vec<(f64, f64)>> = HashMap::new();
+    let mut by_impl: HashMap<String, Vec<(f64, f64)>> = HashMap::new();
 
-    let mut min_lx = f64::INFINITY;
-    let mut max_lx = f64::NEG_INFINITY;
-    let mut min_ly = f64::INFINITY;
-    let mut max_ly = f64::NEG_INFINITY;
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
 
     for rec in recs {
-        if rec.n == 0 {
-            continue;
-        }
-
-        let y_raw = if use_time_per_op {
+        let t = if use_time_per_op {
             rec.time_per_op
         } else {
             rec.time_total
         };
 
-        if y_raw <= 0.0 {
-            continue;
+        if let Some((x, y)) = project_point(rec.n, t, scale) {
+            by_impl
+                .entry(rec.implementation.clone())
+                .or_default()
+                .push((x, y));
+
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
         }
-
-        let lx = (rec.n as f64).log10();
-        let ly = y_raw.log10();
-
-        by_impl_log
-            .entry(rec.implementation.clone())
-            .or_default()
-            .push((lx, ly));
-
-        min_lx = min_lx.min(lx);
-        max_lx = max_lx.max(lx);
-        min_ly = min_ly.min(ly);
-        max_ly = max_ly.max(ly);
     }
 
-    if !min_lx.is_finite() || !min_ly.is_finite() {
-        return Ok(()); // nada pra plotar
+    if !min_x.is_finite() || !min_y.is_finite() {
+        return Ok(());
     }
 
-    // Área do gráfico
-    let filename = format!("{}/{}.png", output_dir, workload);
+    // gráfico
+    let filename = format!("{}/{}_{}.png", output_dir, workload, scale.tag());
     let root = BitMapBackend::new(&filename, (900, 700)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let eixo_y_label = if use_time_per_op {
-        "log10(tempo por operação)"
-    } else {
-        "log10(tempo total)"
-    };
-
-    // Sistema de coordenadas já em log-log
     let mut chart = ChartBuilder::on(&root)
         .caption(
-            format!("{workload} — log-log + regressão"),
+            format!("{workload} — {} + regressão", scale.title()),
             ("sans-serif", 30),
         )
         .margin(20)
         .x_label_area_size(40)
         .y_label_area_size(60)
-        .build_cartesian_2d(min_lx..max_lx, min_ly..max_ly)?;
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
     chart
         .configure_mesh()
-        .x_desc("log10(n)")
-        .y_desc(eixo_y_label)
+        .x_desc(scale.x_label())
+        .y_desc(scale.y_label(use_time_per_op))
         .label_style(("sans-serif", 15))
         .draw()?;
 
-    // Paleta de cores
     let colors = [
         RGBColor(76, 114, 176),
         RGBColor(221, 132, 82),
@@ -162,8 +250,7 @@ fn plot_workload(
         RGBColor(140, 140, 140),
     ];
 
-    // Plota cada implementação
-    for (idx, (impl_name, mut pts)) in by_impl_log.into_iter().enumerate() {
+    for (idx, (impl_name, mut pts)) in by_impl.into_iter().enumerate() {
         if pts.len() < 2 {
             continue;
         }
@@ -173,19 +260,29 @@ fn plot_workload(
         let ys: Vec<f64> = pts.iter().map(|p| p.1).collect();
 
         let (slope, intercept) = linear_regression(&xs, &ys);
-        let c = 10f64.powf(intercept);
+        let r2 = r2_score(&xs, &ys, slope, intercept);
         let color = colors[idx % colors.len()];
 
-        // Escreve coeficientes no CSV
-        writeln!(reg_out, "{workload};{impl_name};{slope:.4};{c:.4e}")?;
+        // Exporta (alpha, C) de forma coerente com a escala.
+        // - Se Y é log10: C = 10^intercept
+        // - Se Y é linear: C = intercept
+        let c = match scale {
+            // y linear => intercept é o próprio C
+            PlotScale::LinLog | PlotScale::LinLin => intercept,
+            // y log10 => intercept = log10(C)
+            PlotScale::LogLog | PlotScale::LogLin => 10f64.powf(intercept),
+        };
 
-        // Pontos
+
+        writeln!(reg_out, "{workload};{impl_name};{slope:.4};{c:.4e};{r2:.6}")?;
+
+        // pontos
         chart.draw_series(
             pts.iter()
-                .map(|(lx, ly)| Circle::new((*lx, *ly), 3, color.filled())),
+                .map(|(x, y)| Circle::new((*x, *y), 3, color.filled())),
         )?;
 
-        // Reta
+        // reta
         let x1 = xs.first().copied().unwrap();
         let x2 = xs.last().copied().unwrap();
         let y1 = slope * x1 + intercept;
@@ -212,8 +309,7 @@ fn plot_workload(
     Ok(())
 }
 
-/// Regressão linear: y = a x + b
-/// Usando fórmula centrada na média (menos propensa a overflow)
+/// Regressão linear: y = a x + b (centrada na média)
 pub fn linear_regression(xs: &[f64], ys: &[f64]) -> (f64, f64) {
     let n = xs.len();
     if n == 0 {

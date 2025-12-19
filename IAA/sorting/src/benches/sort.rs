@@ -1,4 +1,6 @@
 use rand::prelude::*;
+use std::hint::black_box;
+
 use super::core::time_it;
 use crate::algorithms::Sorter;
 
@@ -21,9 +23,11 @@ fn reversed_vec(n: usize) -> Vec<i32> {
 fn almost_sorted_vec(n: usize) -> Vec<i32> {
     let mut v: Vec<i32> = (0..n as i32).collect();
     let swaps = (n / 20).max(1);
+
+    let mut rng = thread_rng();
     for _ in 0..swaps {
-        let i = thread_rng().gen_range(0..n);
-        let j = thread_rng().gen_range(0..n);
+        let i = rng.gen_range(0..n);
+        let j = rng.gen_range(0..n);
         v.swap(i, j);
     }
     v
@@ -36,8 +40,9 @@ where
     S: Sorter<i32>,
 {
     time_it(S::name(), "sort_random", n, n, || {
-        let mut v = random_vec(n);
-        S::sort(&mut v);
+        let mut v = black_box(random_vec(n));
+        S::sort(black_box(v.as_mut_slice()));
+        black_box(&v);
     });
 }
 
@@ -46,8 +51,9 @@ where
     S: Sorter<i32>,
 {
     time_it(S::name(), "sort_sorted", n, n, || {
-        let mut v = sorted_vec(n);
-        S::sort(&mut v);
+        let mut v = black_box(sorted_vec(n));
+        S::sort(black_box(v.as_mut_slice()));
+        black_box(&v);
     });
 }
 
@@ -56,8 +62,9 @@ where
     S: Sorter<i32>,
 {
     time_it(S::name(), "sort_reversed", n, n, || {
-        let mut v = reversed_vec(n);
-        S::sort(&mut v);
+        let mut v = black_box(reversed_vec(n));
+        S::sort(black_box(v.as_mut_slice()));
+        black_box(&v);
     });
 }
 
@@ -66,7 +73,8 @@ where
     S: Sorter<i32>,
 {
     time_it(S::name(), "sort_almost_sorted", n, n, || {
-        let mut v = almost_sorted_vec(n);
-        S::sort(&mut v);
+        let mut v = black_box(almost_sorted_vec(n));
+        S::sort(black_box(v.as_mut_slice()));
+        black_box(&v);
     });
 }

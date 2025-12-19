@@ -1,58 +1,76 @@
+use std::hint::black_box;
+
 use super::Sorter;
 
 pub struct RadixSort;
 
 impl Sorter<i32> for RadixSort {
     fn name() -> &'static str {
-        "radix_sort_lsd"
+        "radix_sort"
     }
 
     fn sort(slice: &mut [i32]) {
-        radix_lsd(slice);
+        radix(slice);
     }
 }
 
-fn radix_lsd(slice: &mut [i32]) {
-    let n = slice.len();
+const B: usize = 256;
+const D: usize = 4;
+
+#[inline(never)]
+fn radix(a: &mut [i32]) {
+    let n = a.len();
     if n <= 1 {
         return;
     }
 
-    let mut output = vec![0i32; n];
+    // buffer auxiliar (B[1..n])
+    let mut out = vec![0i32; n];
 
-    // 4 passes de 8 bits (32 bits)
-    for pass in 0..4 {
-        let mut counts = [0usize; 256];
+    // 4 passes (um por byte)
+    for pass in 0..D {
+        // contadores (C[0..255])
+        let mut counts = [0usize; B];
 
-        // Conta por byte
-        for &v in slice.iter() {
+        // 1) contagem
+        for &v in a.iter() {
             let key = normalize_key(v);
-            let byte = ((key >> (pass * 8)) & 0xFF) as usize;
+            let byte = byte_at(key, pass);
             counts[byte] += 1;
         }
 
-        // Prefix sums
-        for i in 1..256 {
+        // 2) somas prefixadas
+        for i in 1..B {
             counts[i] += counts[i - 1];
         }
 
-        // Distribuição estável (varrendo de trás pra frente)
-        for &v in slice.iter().rev() {
+        // 3) distribuição estável (de trás pra frente)
+        for &v in a.iter().rev() {
             let key = normalize_key(v);
-            let byte = ((key >> (pass * 8)) & 0xFF) as usize;
+            let byte = byte_at(key, pass);
             counts[byte] -= 1;
-            let pos = counts[byte];
-            output[pos] = v;
+            out[counts[byte]] = v;
         }
 
-        // Copia de volta
-        slice.copy_from_slice(&output);
+        // 4) copia de volta
+        a.copy_from_slice(&out);
+
+        // “blindagem” mínima p/ benchmark
+        black_box(&a);
     }
+
+    black_box(&a);
 }
 
-/// Mapeia i32 para u32 tal que a ordem de i32 seja preservada
-/// após a ordenação unsigned: negativos vêm antes dos não-negativos.
-#[inline]
+/// Extrai o `pass`-ésimo byte (0 = LSB) de uma chave u32.
+#[inline(always)]
+fn byte_at(key: u32, pass: usize) -> usize {
+    ((key >> (pass * 8)) & 0xFF) as usize
+}
+
+/// Normaliza i32 -> u32 preservando a ordem dos inteiros com sinal
+/// quando comparados como unsigned (negativos antes dos não-negativos).
+#[inline(always)]
 fn normalize_key(v: i32) -> u32 {
     (v as u32) ^ 0x8000_0000
 }

@@ -56,16 +56,6 @@ fn main() {
         bench_sort_reversed::<HeapSort>(n);
         bench_sort_almost_sorted::<HeapSort>(n);
 
-        bench_sort_random::<CountingSort>(n);
-        bench_sort_sorted::<CountingSort>(n);
-        bench_sort_reversed::<CountingSort>(n);
-        bench_sort_almost_sorted::<CountingSort>(n);
-
-        bench_sort_random::<RadixSort>(n);
-        bench_sort_sorted::<RadixSort>(n);
-        bench_sort_reversed::<RadixSort>(n);
-        bench_sort_almost_sorted::<RadixSort>(n);
-
         // Rust std
         bench_sort_random::<RustStd>(n);
         bench_sort_sorted::<RustStd>(n);
